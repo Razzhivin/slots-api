@@ -1,0 +1,3 @@
+--liquibase formatted sql 
+--changeset author:1 
+CREATE TABLE resources (id BIGSERIAL PRIMARY KEY, name VARCHAR(255) NOT NULL, type VARCHAR(50) NOT NULL, timezone VARCHAR(100) NOT NULL DEFAULT 'UTC', created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP); 

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <include file="db/changelog/releases/v1.0/01-create-resources-table.sql"/>
+    <include file="db/changelog/releases/v1.0/02-create-intervals-table.sql"/>
+    <include file="db/changelog/releases/v1.0/03-create-bookings-table.sql"/>
+    <include file="db/changelog/releases/v1.0/04-add-companies.sql"/>
+
+</databaseChangeLog>

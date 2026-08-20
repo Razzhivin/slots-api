@@ -1,0 +1,21 @@
+target/
+!.mvn/wrapper/maven-wrapper.properties
+class
+.mtj.tmp/
+*.jar
+*.war
+*.ear
+*.db
+
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Логи приложения
+*.log
+
+# Файлы операционной системы
+.DS_Store
+Thumbs.db

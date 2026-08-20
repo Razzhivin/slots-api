@@ -1,0 +1,223 @@
+openapi: 3.0.3
+info:
+  title: Multi-Resource Slot Management SaaS API
+  description: API-first сервис для квантования тайм-слотов, бронирования цепочек мульти-ресурсов и управления сложными графиками в b2b приложениях.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Локальный сервер разработки
+
+security:
+  - BearerAuth: []
+
+paths:
+  /bookings/resources:
+    post:
+      summary: Создать новый ресурс (Сотрудник, Кабинет, Оборудование)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, type]
+              properties:
+                name:
+                  type: string
+                  example: "Доктор Ковалев"
+                type:
+                  type: string
+                  enum: [STAFF, ROOM, EQUIPMENT]
+                  example: "STAFF"
+                timezone:
+                  type: string
+                  example: "Europe/Moscow"
+      responses:
+        '200':
+          description: Успешное создание ресурса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceResponse'
+
+    get:
+      summary: Получить список всех ресурсов компании
+      responses:
+        '200':
+          description: Список ресурсов
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ResourceResponse'
+
+  /bookings/resources/{id}/schedule:
+    put:
+      summary: Полностью перезаписать рабочий график ресурса
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: object
+                required: [day_of_week, start_time, end_time]
+                properties:
+                  day_of_week:
+                    type: string
+                    example: "MONDAY"
+                  start_time:
+                    type: string
+                    example: "09:00:00"
+                  end_time:
+                    type: string
+                    example: "13:00:00"
+      responses:
+        '200':
+          description: График успешно обновлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceResponse'
+
+  /bookings/slots:
+    get:
+      summary: Рассчитать доступные свободные тайм-слоты для группы ресурсов
+      parameters:
+        - name: resourceIds
+          in: query
+          required: true
+          schema:
+            type: string
+            example: "1,2,3"
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+            example: "2026-08-24"
+        - name: slotDurationMinutes
+          in: query
+          schema:
+            type: integer
+            default: 30
+            example: 60
+      responses:
+        '200':
+          description: Сетка доступных слотов в формате UTC
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    start_time:
+                      type: string
+                      format: date-time
+                      example: "2026-08-24T06:00:00Z"
+                    end_time:
+                      type: string
+                      format: date-time
+                      example: "2026-08-24T07:00:00Z"
+
+  /bookings:
+    post:
+      summary: Забронировать тайм-слот для группы мульти-ресурсов (Защита от коллизий)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [resource_ids, start_time, end_time]
+              properties:
+                resource_ids:
+                  type: array
+                  items:
+                    type: integer
+                  example: [1, 2, 3]
+                start_time:
+                  type: string
+                  format: date-time
+                  example: "2026-08-24T07:00:00Z"
+                end_time:
+                  type: string
+                  format: date-time
+                  example: "2026-08-24T08:00:00Z"
+      responses:
+        '200':
+          description: Бронирование успешно создано
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingResponse'
+        '409':
+          description: Конфликт — слот уже занят (SLOT_ALREADY_BOOKED)
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: Введите ваш секретный b2b API-ключ в формате "sk_live_..."
+
+  schemas:
+    IntervalResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        day_of_week:
+          type: string
+        start_time:
+          type: string
+          example: "09:00:00"
+        end_time:
+          type: string
+          example: "13:00:00"
+
+    ResourceResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        type:
+          type: string
+        timezone:
+          type: string
+        availabilityIntervals:
+          type: array
+          items:
+            $ref: '#/components/schemas/IntervalResponse'
+
+    BookingResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          example: "CONFIRMED"
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        resourceIds:
+          type: array
+          items:
+            type: integer
