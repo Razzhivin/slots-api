@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  # 1. Контейнер с базой данных PostgreSQL
+  postgres-db:
+    image: postgres:15-alpine
+    container_name: slots-postgres
+    environment:
+      POSTGRES_DB: slots_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - slots-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d slots_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 2. Контейнер с Java Spring Boot slots-api
+  slots-api-app:
+    build: .
+    container_name: slots-api-service
+    ports:
+      - "8080:8080"
+    environment:
+      JDBC_DATABASE_URL: jdbc:postgresql://postgres-db:5432/slots_db
+      JDBC_DATABASE_USERNAME: postgres
+      JDBC_DATABASE_PASSWORD: password
+      SPRING_PROFILES_ACTIVE: dev # АКТИВИРУЕМ ПРОФИЛЬ РАЗРАБОТКИ ВНУТРИ КОНТЕЙНЕРА
+    depends_on:
+      postgres-db:
+        condition: service_healthy # Ждем, пока база данных полностью поднимется и станет доступна
+    networks:
+      - slots-network
+
+networks:
+  slots-network:
+    driver: bridge
+
+volumes:
+  pgdata:

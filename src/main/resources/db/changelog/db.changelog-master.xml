@@ -8,5 +8,6 @@
     <include file="db/changelog/releases/v1.0/02-create-intervals-table.sql"/>
     <include file="db/changelog/releases/v1.0/03-create-bookings-table.sql"/>
     <include file="db/changelog/releases/v1.0/04-add-companies.sql"/>
+    <include file="db/changelog/releases/v1.0/05-seed-test-data.sql" context="dev"/>
 
 </databaseChangeLog>

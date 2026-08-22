@@ -1,8 +1,9 @@
 ﻿spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/slots_db
-    username: postgres
-    password: postgres
+    # Если переменная JDBC_DATABASE_URL не передана, Spring использует локальный localhost
+    url: ${JDBC_DATABASE_URL:jdbc:postgresql://localhost:5432/slots_db}
+    username: ${JDBC_DATABASE_USERNAME:postgres}
+    password: ${JDBC_DATABASE_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
