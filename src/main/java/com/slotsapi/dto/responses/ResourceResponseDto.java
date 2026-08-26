@@ -1,4 +1,4 @@
-package com.slotsapi.dto;
+package com.slotsapi.dto.responses;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -11,5 +11,5 @@ public class ResourceResponseDto {
     private String name;
     private String type;
     private String timezone;
-    private List<com.slotsapi.dto.IntervalResponseDto> availabilityIntervals;
+    private List<IntervalResponseDto> availabilityIntervals;
 }

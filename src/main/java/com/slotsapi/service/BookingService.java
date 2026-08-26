@@ -1,13 +1,14 @@
 package com.slotsapi.service;
 
-import com.slotsapi.dto.*;
-import com.slotsapi.dto.BookingResponseDto;
-import com.slotsapi.dto.IntervalResponseDto;
-import com.slotsapi.dto.ResourceResponseDto;
+import com.slotsapi.dto.requests.IntervalCreateDto;
+import com.slotsapi.dto.responses.BookingResponseDto;
+import com.slotsapi.dto.responses.IntervalResponseDto;
+import com.slotsapi.dto.responses.ResourceResponseDto;
 import com.slotsapi.model.*;
 import com.slotsapi.repository.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.time.*;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -37,23 +38,30 @@ public class BookingService {
     }
 
     @Transactional
-    public ResourceResponseDto addAvailabilityInterval(Long companyId, Long resourceId, String dayOfWeekStr, String startTimeStr, String endTimeStr) {
-        Resource resource = resourceRepository.findById(resourceId)
-                .orElseThrow(() -> new IllegalArgumentException("Resource not found."));
-        if (!resource.getCompany().getId().equals(companyId)) {
-            throw new SecurityException("Access denied: Resource belongs to another company.");
-        }
+    public ResourceResponseDto addAvailabilityInterval(Long companyId, Long resourceId, IntervalCreateDto dto) {
+        // Защищенный поиск ресурса
+        Resource resource = getRawResourceVerified(companyId, resourceId);
+
         ResourceAvailabilityInterval interval = new ResourceAvailabilityInterval();
         interval.setResource(resource);
-        interval.setDayOfWeek(DayOfWeek.valueOf(dayOfWeekStr.toUpperCase()));
-        interval.setStartTime(LocalTime.parse(startTimeStr));
-        interval.setEndTime(LocalTime.parse(endTimeStr));
+        interval.setDayOfWeek(DayOfWeek.valueOf(dto.getDayOfWeek().toUpperCase()));
+        interval.setStartTime(LocalTime.parse(dto.getStartTime()));
+        interval.setEndTime(LocalTime.parse(dto.getEndTime()));
+
         resource.getAvailabilityIntervals().add(interval);
         return mapToResourceDto(resourceRepository.save(resource));
     }
 
     @Transactional
     public BookingResponseDto createBooking(Long companyId, Set<Long> resourceIds, OffsetDateTime start, OffsetDateTime end) {
+        if (resourceIds == null || resourceIds.isEmpty()) {
+            throw new IllegalArgumentException("Resource IDs list cannot be null or empty.");
+        }
+        if (!end.isAfter(start)) {
+            throw new IllegalArgumentException("Validation failed: End time must be strictly after start time.");
+        }
+
+        // Защищенный поиск всей цепочки ресурсов одной компании
         List<Resource> lockedResources = resourceRepository.findByIdInAndCompanyId(resourceIds, companyId);
         if (lockedResources.size() != resourceIds.size()) {
             throw new IllegalArgumentException("One or more resources not found or belong to another company.");
@@ -66,6 +74,7 @@ public class BookingService {
         if (resourceRepository.countOverlappingBookings(companyId, resourceIds, start, end) > 0) {
             throw new IllegalStateException("SLOT_ALREADY_BOOKED");
         }
+
         Company company = companyRepository.findById(companyId).orElseThrow();
         Booking booking = new Booking();
         booking.setStartTime(start);
@@ -83,16 +92,14 @@ public class BookingService {
 
     @Transactional(readOnly = true)
     public ResourceResponseDto getResourceById(Long companyId, Long resourceId) {
-        Resource resource = resourceRepository.findById(resourceId)
-                .orElseThrow(() -> new IllegalArgumentException("Resource not found"));
-        if (!resource.getCompany().getId().equals(companyId)) throw new SecurityException("Access denied");
-        return mapToResourceDto(resource);
+        return mapToResourceDto(getRawResourceVerified(companyId, resourceId));
     }
 
     @Transactional
     public ResourceResponseDto updateResource(Long companyId, Long resourceId, String name, String type, String timezone) {
-        ResourceResponseDto dto = getResourceById(companyId, resourceId);
-        Resource resource = resourceRepository.findById(resourceId).orElseThrow();
+        // Защищенный поиск перед обновлением базовых полей
+        Resource resource = getRawResourceVerified(companyId, resourceId);
+
         if (name != null) resource.setName(name);
         if (type != null) resource.setType(type);
         if (timezone != null) resource.setTimezone(timezone);
@@ -101,31 +108,36 @@ public class BookingService {
 
     @Transactional
     public void deleteResource(Long companyId, Long resourceId) {
-        ResourceResponseDto dto = getResourceById(companyId, resourceId);
-        resourceRepository.deleteById(resourceId);
+        // Проверяем существование и владение перед удалением
+        Resource resource = getRawResourceVerified(companyId, resourceId);
+        resourceRepository.delete(resource);
     }
 
     @Transactional
-    public ResourceResponseDto updateResourceSchedule(Long companyId, Long resourceId, List<Map<String, String>> newIntervals) {
-        ResourceResponseDto dto = getResourceById(companyId, resourceId);
-        Resource resource = resourceRepository.findById(resourceId).orElseThrow();
+    public ResourceResponseDto updateResourceSchedule(Long companyId, Long resourceId, List<IntervalCreateDto> newIntervals) {
+        // Жесткая проверка: принадлежит ли очищаемый график текущему b2b-клиенту
+        Resource resource = getRawResourceVerified(companyId, resourceId);
+
         resource.getAvailabilityIntervals().clear();
-        for (Map<String, String> intervalData : newIntervals) {
+
+        for (IntervalCreateDto intervalData : newIntervals) {
             ResourceAvailabilityInterval interval = new ResourceAvailabilityInterval();
             interval.setResource(resource);
-            interval.setDayOfWeek(DayOfWeek.valueOf(intervalData.get("day_of_week").toUpperCase()));
-            interval.setStartTime(LocalTime.parse(intervalData.get("start_time")));
-            interval.setEndTime(LocalTime.parse(intervalData.get("end_time")));
+            interval.setDayOfWeek(DayOfWeek.valueOf(intervalData.getDayOfWeek().toUpperCase()));
+            interval.setStartTime(LocalTime.parse(intervalData.getStartTime()));
+            interval.setEndTime(LocalTime.parse(intervalData.getEndTime()));
             resource.getAvailabilityIntervals().add(interval);
         }
+
         return mapToResourceDto(resourceRepository.save(resource));
     }
 
     public List<Map<String, OffsetDateTime>> getAvailableSlots(Long companyId, Set<Long> resourceIds, LocalDate date, int slotDurationMinutes) {
         List<Resource> resources = resourceRepository.findAllById(resourceIds);
         if (resources.isEmpty()) return Collections.emptyList();
+
         boolean isOwner = resources.stream().allMatch(r -> r.getCompany().getId().equals(companyId));
-        if (!isOwner) throw new SecurityException("Access denied");
+        if (!isOwner) throw new SecurityException("Access denied: Resources belong to another company.");
 
         ZoneId utc = ZoneId.of("UTC");
         OffsetDateTime dayStart = date.atStartOfDay().atZone(utc).toOffsetDateTime();
@@ -133,12 +145,15 @@ public class BookingService {
         List<Booking> activeBookings = bookingRepository.findBookingsForResources(companyId, resourceIds, dayStart, dayEnd);
         List<Map<String, OffsetDateTime>> targetSlots = new ArrayList<>();
         OffsetDateTime currentIntervalStart = dayStart;
+
         while (currentIntervalStart.plusMinutes(slotDurationMinutes).isBefore(dayEnd)) {
             OffsetDateTime currentIntervalEnd = currentIntervalStart.plusMinutes(slotDurationMinutes);
             final OffsetDateTime startCheck = currentIntervalStart;
             final OffsetDateTime endCheck = currentIntervalEnd;
+
             boolean allWorking = resources.stream().allMatch(r -> isResourceAvailableInItsSchedule(r, startCheck, endCheck));
             boolean hasConflict = activeBookings.stream().anyMatch(b -> b.getStartTime().isBefore(endCheck) && b.getEndTime().isAfter(startCheck));
+
             if (allWorking && !hasConflict) {
                 Map<String, OffsetDateTime> slot = new HashMap<>();
                 slot.put("start_time", startCheck);
@@ -148,6 +163,17 @@ public class BookingService {
             currentIntervalStart = currentIntervalStart.plusMinutes(slotDurationMinutes);
         }
         return targetSlots;
+    }
+
+    // --- СЕРВИСНЫЙ МЕТОД ЗАЩИТЫ ПЕРИМЕТРА (GUARD METHOD) ---
+    private Resource getRawResourceVerified(Long companyId, Long resourceId) {
+        Resource resource = resourceRepository.findById(resourceId)
+                .orElseThrow(() -> new IllegalArgumentException("Resource not found with ID: " + resourceId));
+
+        if (!resource.getCompany().getId().equals(companyId)) {
+            throw new SecurityException("Access denied: You do not own this resource.");
+        }
+        return resource;
     }
 
     // --- МАППЕРЫ ---
@@ -178,13 +204,25 @@ public class BookingService {
         return dto;
     }
 
+    // Внедрена логика проверки сквозных интервалов через полночь
     private boolean isResourceAvailableInItsSchedule(Resource resource, OffsetDateTime startUtc, OffsetDateTime endUtc) {
         ZoneId resourceZone = ZoneId.of(resource.getTimezone());
         ZonedDateTime localStart = startUtc.atZoneSameInstant(resourceZone);
         ZonedDateTime localEnd = endUtc.atZoneSameInstant(resourceZone);
-        DayOfWeek startDay = localStart.getDayOfWeek();
+        if (localStart.toLocalDate().isBefore(localEnd.toLocalDate())) {
+            ZonedDateTime endOfFirstDay = localStart.toLocalDate().atTime(LocalTime.MAX).atZone(resourceZone);
+            ZonedDateTime startOfSecondDay = localEnd.toLocalDate().atStartOfDay(resourceZone);
+            return checkSingleDayAvailability(resource, localStart, endOfFirstDay) && checkSingleDayAvailability(resource, startOfSecondDay, localEnd);
+        }
+        return checkSingleDayAvailability(resource, localStart, localEnd);
+    }
+
+    private boolean checkSingleDayAvailability(Resource resource, ZonedDateTime start, ZonedDateTime end) {
+        DayOfWeek day = start.getDayOfWeek();
+        LocalTime startTime = start.toLocalTime();
+        LocalTime endTime = end.toLocalTime();
         return resource.getAvailabilityIntervals().stream()
-                .filter(i -> i.getDayOfWeek() == startDay)
-                .anyMatch(i -> !localStart.toLocalTime().isBefore(i.getStartTime()) && !localEnd.toLocalTime().isAfter(i.getEndTime()));
+                .filter(i -> i.getDayOfWeek() == day)
+                .anyMatch(i -> !startTime.isBefore(i.getStartTime()) && !endTime.isAfter(i.getEndTime()));
     }
 }

@@ -1,4 +1,4 @@
-package com.slotsapi.dto;
+package com.slotsapi.dto.responses;
 
 import lombok.Getter;
 import lombok.Setter;

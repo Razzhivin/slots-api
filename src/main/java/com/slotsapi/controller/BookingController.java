@@ -1,12 +1,15 @@
 package com.slotsapi.controller;
 
-import com.slotsapi.dto.*;
-import com.slotsapi.dto.BookingResponseDto;
-import com.slotsapi.dto.ResourceResponseDto;
+import com.slotsapi.dto.requests.*;
+import com.slotsapi.dto.responses.BookingResponseDto;
+import com.slotsapi.dto.responses.ResourceResponseDto;
 import com.slotsapi.service.BookingService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -14,20 +17,21 @@ import java.util.Map;
 import java.util.Set;
 
 @RestController
+@RequiredArgsConstructor
 @RequestMapping("/api/v1/bookings")
 public class BookingController {
 
     private final BookingService bookingService;
 
-    public BookingController(BookingService bookingService) {
-        this.bookingService = bookingService;
-    }
+    // --- УПРАВЛЕНИЕ РЕСУРСАМИ (CRUD) ---
 
     @PostMapping("/resources")
     public ResponseEntity<ResourceResponseDto> createResource(
             @RequestAttribute("CURRENT_COMPANY_ID") Long companyId,
-            @RequestBody Map<String, String> request) {
-        ResourceResponseDto created = bookingService.createResource(companyId, request.get("name"), request.get("type"), request.get("timezone"));
+            @RequestBody ResourceCreateDto request) {
+        ResourceResponseDto created = bookingService.createResource(
+                companyId, request.getName(), request.getType(), request.getTimezone()
+        );
         return ResponseEntity.ok(created);
     }
 
@@ -47,8 +51,10 @@ public class BookingController {
     public ResponseEntity<ResourceResponseDto> modifyResource(
             @RequestAttribute("CURRENT_COMPANY_ID") Long companyId,
             @PathVariable Long id,
-            @RequestBody Map<String, String> request) {
-        ResourceResponseDto updated = bookingService.updateResource(companyId, id, request.get("name"), request.get("type"), request.get("timezone"));
+            @RequestBody ResourceUpdateDto request) {
+        ResourceResponseDto updated = bookingService.updateResource(
+                companyId, id, request.getName(), request.getType(), request.getTimezone()
+        );
         return ResponseEntity.ok(updated);
     }
 
@@ -60,12 +66,14 @@ public class BookingController {
         return ResponseEntity.noContent().build();
     }
 
+    // --- УПРАВЛЕНИЕ ГРАФИКАМИ И ИНТЕРВАЛАМИ ---
+
     @PostMapping("/resources/{resourceId}/intervals")
     public ResponseEntity<ResourceResponseDto> addInterval(
             @RequestAttribute("CURRENT_COMPANY_ID") Long companyId,
             @PathVariable Long resourceId,
-            @RequestBody Map<String, String> request) {
-        ResourceResponseDto updated = bookingService.addAvailabilityInterval(companyId, resourceId, request.get("day_of_week"), request.get("start_time"), request.get("end_time"));
+            @Valid @RequestBody IntervalCreateDto request) {
+        ResourceResponseDto updated = bookingService.addAvailabilityInterval(companyId, resourceId, request);
         return ResponseEntity.ok(updated);
     }
 
@@ -73,10 +81,12 @@ public class BookingController {
     public ResponseEntity<ResourceResponseDto> overrideSchedule(
             @RequestAttribute("CURRENT_COMPANY_ID") Long companyId,
             @PathVariable Long id,
-            @RequestBody List<Map<String, String>> request) {
-        ResourceResponseDto updated = bookingService.updateResourceSchedule(companyId, id, request);
+            @Valid @RequestBody ScheduleOverrideDto request) {
+        ResourceResponseDto updated = bookingService.updateResourceSchedule(companyId, id, request.getIntervals());
         return ResponseEntity.ok(updated);
     }
+
+    // --- БРОНИРОВАНИЕ И СЛОТЫ ---
 
     @GetMapping("/slots")
     public ResponseEntity<List<Map<String, OffsetDateTime>>> getSlots(
@@ -90,12 +100,14 @@ public class BookingController {
     @PostMapping
     public ResponseEntity<BookingResponseDto> createBooking(
             @RequestAttribute("CURRENT_COMPANY_ID") Long companyId,
-            @RequestBody Map<String, Object> request) {
-        List<Integer> ids = (List<Integer>) request.get("resource_ids");
-        Set<Long> rIds = new java.util.HashSet<>();
-        for (Integer id : ids) { rIds.add(id.longValue()); }
-        OffsetDateTime start = OffsetDateTime.parse((String) request.get("start_time"));
-        OffsetDateTime end = OffsetDateTime.parse((String) request.get("end_time"));
-        return ResponseEntity.ok(bookingService.createBooking(companyId, rIds, start, end));
+            @Valid @RequestBody BookingCreateDto request) {
+
+        OffsetDateTime start = OffsetDateTime.parse(request.getStartTime());
+        OffsetDateTime end = OffsetDateTime.parse(request.getEndTime());
+
+        BookingResponseDto created = bookingService.createBooking(
+                companyId, request.getResourceIds(), start, end
+        );
+        return ResponseEntity.ok(created);
     }
 }
