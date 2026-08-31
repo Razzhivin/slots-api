@@ -3,12 +3,12 @@ version: '3.8'
 services:
   # 1. Контейнер с базой данных PostgreSQL
   postgres-db:
-    image: postgres:15-alpine
+    image: postgres:15-alpine # Используем зеркало для стабильного скачивания
     container_name: slots-postgres
     environment:
       POSTGRES_DB: slots_db
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
+      POSTGRES_PASSWORD: ${DB_PASSWORD} # Динамический пароль из .env
     ports:
       - "5432:5432"
     volumes:
@@ -30,11 +30,12 @@ services:
     environment:
       JDBC_DATABASE_URL: jdbc:postgresql://postgres-db:5432/slots_db
       JDBC_DATABASE_USERNAME: postgres
-      JDBC_DATABASE_PASSWORD: password
-      SPRING_PROFILES_ACTIVE: dev # АКТИВИРУЕМ ПРОФИЛЬ РАЗРАБОТКИ ВНУТРИ КОНТЕЙНЕРА
+      JDBC_DATABASE_PASSWORD: ${DB_PASSWORD} # Динамический пароль из .env
+      APP_SECURITY_MARKETPLACE_SECRET: ${MARKETPLACE_SIGNING_SECRET} # Секрет подписи из .env
+      SPRING_PROFILES_ACTIVE: ${ACTIVE_PROFILE} # Профиль из .env (dev/prod)
     depends_on:
       postgres-db:
-        condition: service_healthy # Ждем, пока база данных полностью поднимется и станет доступна
+        condition: service_healthy
     networks:
       - slots-network
 

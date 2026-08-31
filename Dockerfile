@@ -8,6 +8,6 @@ RUN mvn clean package -DskipTests
 # Шаг 2: Легковесный запуск на Eclipse Temurin JRE 17
 FROM mirror.gcr.io/library/eclipse-temurin:17-jre-jammy
 WORKDIR /app
-COPY --from=build /app/target/slots-api-0.0.1-SNAPSHOT.jar app.jar
+COPY --from=build /app/target/slots-api-*.jar app.jar
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]

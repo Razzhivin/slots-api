@@ -19,3 +19,4 @@ class
 # Файлы операционной системы
 .DS_Store
 Thumbs.db
+.env
