@@ -10,4 +10,8 @@
     <include file="db/changelog/releases/v1.0/04-add-companies.sql"/>
     <include file="db/changelog/releases/v1.0/05-seed-test-data.sql" context="dev"/>
 
+    <!-- ArmoCRM -->
+    <include file="db/changelog/armo_crm/01-update-base-structure-for-armocrm.sql"/>
+
+
 </databaseChangeLog>
