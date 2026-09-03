@@ -1,6 +1,7 @@
 package com.slotsapi.security;
 
 import com.slotsapi.repository.ApiKeyRepository;
+import com.slotsapi.repository.CompanyRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Component;
@@ -12,9 +13,11 @@ import java.util.Optional;
 public class ApiKeyInterceptor implements HandlerInterceptor {
 
     private final ApiKeyRepository apiKeyRepository;
+    private final CompanyRepository companyRepository;
 
-    public ApiKeyInterceptor(ApiKeyRepository apiKeyRepository) {
+    public ApiKeyInterceptor(ApiKeyRepository apiKeyRepository, CompanyRepository companyRepository) {
         this.apiKeyRepository = apiKeyRepository;
+        this.companyRepository = companyRepository;
     }
 
     @Override
@@ -33,6 +36,13 @@ public class ApiKeyInterceptor implements HandlerInterceptor {
         if (companyIdOpt.isEmpty()) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.getWriter().write("Invalid or inactive API key");
+            return false;
+        }
+
+        Optional<Boolean> isActiveOpt = companyRepository.findActiveStatusById(companyIdOpt.get());
+        if (isActiveOpt.isEmpty()) {
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            response.getWriter().write("Company account is inactive");
             return false;
         }
 

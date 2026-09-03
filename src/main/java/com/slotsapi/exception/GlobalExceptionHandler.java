@@ -128,4 +128,9 @@ public class GlobalExceptionHandler {
         body.put("message", errorMessage.toString().trim());
         return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
     }
+
+    @ExceptionHandler(OAuthException.class)
+    public ResponseEntity<String> handleOAuth(OAuthException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+    }
 }
