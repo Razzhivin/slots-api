@@ -60,13 +60,15 @@ public class AmoAuthService {
         company.setAmocrmSubdomain(subdomain);
         company.setAmocrmAccountId(accountId);
         company.setActive(true);
-        company = companyRepository.save(company);
+        company = companyRepository.save(company); // сохраняем компанию
 
         ApiKey apiKey = new ApiKey();
         apiKey.setKeyToken("sk_" + UUID.randomUUID().toString().replace("-", ""));
         apiKey.setCompany(company);
         apiKey.setActive(true);
-        apiKeyRepository.save(apiKey);
+        company.getApiKeys().add(apiKey);
+        // Сохраняем компанию с ключом (каскад сам сохранит ключ)
+        companyRepository.save(company);
 
         return company;
     }

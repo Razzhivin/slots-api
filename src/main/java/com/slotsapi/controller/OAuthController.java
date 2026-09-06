@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.HttpStatus;
+import java.net.URI;
 
 import java.util.UUID;
 
@@ -31,14 +33,16 @@ public class OAuthController {
      * Этот эндпоинт будет использоваться из виджета для открытия окна авторизации.
      */
     @GetMapping("/authorize")
-    public String authorize(HttpSession session) {
+    public ResponseEntity<Void> authorize(HttpSession session) {
         String state = UUID.randomUUID().toString();
         session.setAttribute("oauth_state", state);
         String redirectUrl = "https://www.amocrm.ru/oauth?client_id=" + clientId +
                 "&state=" + state +
                 "&mode=popup";
         log.info("Redirecting to amoCRM OAuth with state: {}", state);
-        return "redirect:" + redirectUrl;
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .location(URI.create(redirectUrl))
+                .build();
     }
 
     /**
